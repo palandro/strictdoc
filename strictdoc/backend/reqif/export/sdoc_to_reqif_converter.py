@@ -1,5 +1,5 @@
-import uuid
 import datetime
+import uuid
 from enum import Enum
 from typing import Dict, List
 
@@ -10,8 +10,8 @@ from reqif.models.reqif_data_type import (
     ReqIFEnumValue,
 )
 from reqif.models.reqif_namespace_info import ReqIFNamespaceInfo
-from reqif.models.reqif_reqif_header import ReqIFReqIFHeader
 from reqif.models.reqif_req_if_content import ReqIFReqIFContent
+from reqif.models.reqif_reqif_header import ReqIFReqIFHeader
 from reqif.models.reqif_spec_hierarchy import ReqIFSpecHierarchy
 from reqif.models.reqif_spec_object import ReqIFSpecObject, SpecObjectAttribute
 from reqif.models.reqif_spec_object_type import (
@@ -57,6 +57,12 @@ def generate_unique_identifier(element_type: str) -> str:
     return f"{element_type}-{uuid.uuid4()}"
 
 
+class SDocToReqIFContext:
+    def __init__(self):
+        self.map_req_type_values: Dict[str, str] = {}
+        self.capella_data_type = None
+
+
 class SDocToReqIFObjectConverter:
     @classmethod
     def convert_document_tree(
@@ -66,6 +72,8 @@ class SDocToReqIFObjectConverter:
         creation_time = datetime.datetime.now(
             datetime.datetime.now().astimezone().tzinfo
         ).isoformat()
+
+        context = SDocToReqIFContext()
 
         # TODO
         namespace = "http://www.omg.org/spec/ReqIF/20110401/reqif.xsd"
@@ -77,8 +85,32 @@ class SDocToReqIFObjectConverter:
         data_types = []
         data_types_lookup = {}
         document: Document
+
+        capella_req_type_values = []
+        capella_req_type_values_map = {}
+
         for document in document_tree.document_list:
-            for element in document.grammar.elements:
+            # Create Capella type
+
+            # ....
+            for element_idx, element in enumerate(document.grammar.elements):
+                # Register each requirement type as Capella type.
+                option = str(element_idx)
+                value = ReqIFEnumValue(
+                    description=None,
+                    identifier=generate_unique_identifier(
+                        f"ENUM-VALUE-{element.tag}"
+                    ),
+                    long_name=element.tag,
+                    last_change=None,
+                    key=option,
+                    other_content=None,
+                )
+                capella_req_type_values.append(value)
+                capella_req_type_values_map[option] = option
+                context.map_req_type_values[element.tag] = value
+
+                # ....
                 for field in element.fields:
                     if isinstance(field, GrammarElementFieldString):
                         if (
@@ -174,7 +206,9 @@ class SDocToReqIFObjectConverter:
                         raise NotImplementedError(field) from None
 
             document_spec_types = cls._convert_document_grammar_to_spec_types(
-                grammar=document.grammar, data_types_lookup=data_types_lookup
+                grammar=document.grammar,
+                data_types_lookup=data_types_lookup,
+                context=context,
             )
             spec_types.extend(document_spec_types)
 
@@ -272,7 +306,9 @@ class SDocToReqIFObjectConverter:
 
                 elif node.is_requirement:
                     spec_object = cls._convert_requirement_to_spec_object(
-                        requirement=node, grammar=document.grammar
+                        requirement=node,
+                        grammar=document.grammar,
+                        context=context,
                     )
                     spec_objects.append(spec_object)
                     hierarchy = ReqIFSpecHierarchy(
@@ -305,6 +341,21 @@ class SDocToReqIFObjectConverter:
                 children=root_hierarchy.children,
             )
             specifications.append(specification)
+
+        # Capella data type
+        data_type = ReqIFDataTypeDefinitionEnumeration(
+            is_self_closed=False,
+            description=None,
+            identifier=(generate_unique_identifier("Capella-Requirement-Type")),
+            last_change=None,
+            long_name="IE Object Type",
+            multi_valued=False,
+            values=capella_req_type_values,
+            values_map=capella_req_type_values_map,
+        )
+        data_types.append(data_type)
+        data_types_lookup[data_type.identifier] = data_type
+        context.capella_data_type = data_type
 
         reqif_reqif_content = ReqIFReqIFContent(
             data_types=data_types,
@@ -359,6 +410,7 @@ class SDocToReqIFObjectConverter:
         cls,
         requirement: Requirement,
         grammar: DocumentGrammar,
+        context: SDocToReqIFContext,
     ) -> ReqIFSpecObject:
         grammar_element = grammar.elements_by_type[requirement.requirement_type]
 
@@ -404,6 +456,15 @@ class SDocToReqIFObjectConverter:
             attributes.append(attribute)
             attribute_map[field.field_name] = attribute
 
+        attribute = SpecObjectAttribute(
+            xml_node=None,
+            attribute_type=SpecObjectAttributeType.ENUMERATION,
+            definition_ref="TBD",
+            value=context.map_req_type_values[requirement.requirement_type].key,
+        )
+        attributes.append(attribute)
+        attribute_map[context.ad_iot_id] = attribute
+
         spec_object = ReqIFSpecObject(
             xml_node=None,
             description=None,
@@ -419,7 +480,10 @@ class SDocToReqIFObjectConverter:
 
     @classmethod
     def _convert_document_grammar_to_spec_types(
-        cls, grammar: DocumentGrammar, data_types_lookup
+        cls,
+        grammar: DocumentGrammar,
+        data_types_lookup,
+        context: SDocToReqIFContext,
     ):
         spec_object_types: List = []
 
@@ -509,6 +573,23 @@ class SDocToReqIFObjectConverter:
             attribute_map[
                 chapter_name_attribute.identifier
             ] = chapter_name_attribute
+
+            # IE Object Type Attribute
+            attribute = SpecAttributeDefinition(
+                xml_node=None,
+                attribute_type=SpecObjectAttributeType.ENUMERATION,
+                description=None,
+                identifier=generate_unique_identifier("SA-IOT-REQ"),
+                last_change=None,
+                datatype_definition=context.capella_data_type.identifier,
+                long_name="IE Object Type",
+                editable=None,
+                default_value=None,
+                multi_valued=False,
+            )
+            attribute_definitions.append(attribute)
+            attribute_map[attribute.identifier] = attribute
+            context.ad_iot_id = attribute.identifier
 
             spec_object_type = ReqIFSpecObjectType(
                 description=None,

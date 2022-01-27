@@ -1,0 +1,19 @@
+[DOCUMENT]
+TITLE: Document one requirement
+
+[GRAMMAR]
+ELEMENTS:
+- TAG: REQUIREMENT
+  FIELDS:
+  - TITLE: UID
+    TYPE: String
+    REQUIRED: False
+  - TITLE: STATEMENT
+    TYPE: String
+    REQUIRED: False
+
+[REQUIREMENT]
+UID: LLR001
+STATEMENT: >>>
+The mapping function shall map requirement_ID to UID.
+<<<
