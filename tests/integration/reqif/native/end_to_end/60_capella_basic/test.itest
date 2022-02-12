@@ -1,0 +1,15 @@
+RUN: %strictdoc export --formats=reqif-sdoc %S/sample.sdoc
+UN: %cat %S/output/reqif/output.reqif | filecheck %s
+UN: %strictdoc import reqif sdoc %S/output/reqif/output.reqif %S/output/sample.sdoc
+UN: diff %S/sample.sdoc %S/output/sample.sdoc
+
+CHECK:        <SPECIFICATION-TYPE IDENTIFIER="SDOC_SPECIFICATION_TYPE_SINGLETON" LAST-CHANGE="{{.*}}" LONG-NAME="SDOC_SPECIFICATION_TYPE_SINGLETON">
+CHECK:        </SPECIFICATION-TYPE>
+CHECK:        <SPECIFICATION IDENTIFIER="SPECIFICATION-{{.*}}" LONG-NAME="Document one requirement">
+CHECK:          <TYPE>
+CHECK:            <SPECIFICATION-TYPE-REF>SDOC_SPECIFICATION_TYPE_SINGLETON</SPECIFICATION-TYPE-REF>
+CHECK:          </TYPE>
+
+IE Object Type: DT-IOT-REQ-f72a872b-21e8-4c76-98af-467ddc9d8355
+Capella.Req: {&quot;uuid&quot;: &quot;d605e695-2e39-4c92-b863-d096162e0014&quot;, &quot;name&quot;: &quot;Flight modes&quot;, &quot;long_name&quot;: null, &quot;doc_url&quot;: &quot;../../../system_architecture/output/test/d605e6952e394c92b863d096162e0014.html&quot;}
+Capella.Allocs: [{&quot;uuid&quot;: &quot;f9cabb24-100b-4e68-930a-8f35ec38c106&quot;, &quot;name&quot;: &quot;Watch Movie&quot;, &quot;long_name&quot;: null, &quot;doc_url&quot;: &quot;../../../system_architecture/output/test/f9cabb24100b4e68930a8f35ec38c106.html&quot;}]
