@@ -16,6 +16,16 @@ def run_invoke_cmd(context, cmd) -> invoke.runners.Result:
 
 
 @task
+def server(context):
+    run_invoke_cmd(context, oneline_command("""
+        uvicorn
+            --app-dir strictdoc/server
+            --factory 'main:strictdoc_production_app'
+            --reload
+    """))
+
+
+@task
 def clean(context):
     find_command = oneline_command(
         """
@@ -95,17 +105,30 @@ def sphinx(context):
 
 
 @task
-def test_unit(context):
+def test_unit(context, focus=None):
+    focus_argument = f"-k {focus}" if focus is not None else ""
     run_invoke_cmd(
         context,
         oneline_command(
+            f"""
+                pytest tests/unit/ {focus_argument}
             """
-        coverage run
-            --rcfile=.coveragerc
-            --branch
-            -m pytest
-            tests/unit/
-        """
+        ),
+    )
+
+
+@task
+def test_unit_coverage(context):
+    run_invoke_cmd(
+        context,
+        oneline_command(
+            f"""
+                coverage run
+                --rcfile=.coveragerc
+                --branch
+                -m pytest
+                tests/unit/
+            """
         ),
     )
     run_invoke_cmd(
@@ -118,7 +141,7 @@ def test_unit(context):
     )
 
 
-@task(test_unit)
+@task(test_unit_coverage)
 def test_coverage_report(context):
     run_invoke_cmd(
         context,
