@@ -16,6 +16,16 @@ def run_invoke_cmd(context, cmd) -> invoke.runners.Result:
 
 
 @task
+def server(context):
+    run_invoke_cmd(context, oneline_command("""
+        uvicorn
+            --app-dir strictdoc/server
+            --factory 'main:strictdoc_production_app'
+            --reload
+    """))
+
+
+@task
 def clean(context):
     find_command = oneline_command(
         """
