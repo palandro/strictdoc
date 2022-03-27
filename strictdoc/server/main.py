@@ -1,4 +1,5 @@
 import os
+import uuid
 from typing import List, Optional
 
 from fastapi import FastAPI, APIRouter
@@ -23,27 +24,39 @@ class RequirementsModel(BaseModel):
     requirements: List[RequirementModel]
 
 
+class NodeUpdateModel(BaseModel):
+    text_source: str
+    text_html: Optional[str]
+
+
 DOC_FILE = "docs/strictdoc.sdoc"
+
+
+def create_uid() -> str:
+    return str(uuid.uuid4())
 
 
 def create_requirements_router() -> APIRouter:
     router = APIRouter()
 
+    document = SDReader().read_from_file(DOC_FILE)
+
     @router.get("/requirements", response_class=JSONResponse)
     def get_requirements():
         print(os.getcwd())
-        document = SDReader().read_from_file(DOC_FILE)
         requirements = []
-        uid = 0
+
         iterator = DocumentCachingIterator(document)
         for node in iterator.all_content():
-            uid = uid + 1
             if isinstance(node, Requirement):
                 requirement_dict = {
                     "type": "REQUIREMENT",
-                    "uid": uid,
+                    "uid": create_uid(),
                     "title": node.title,
-                    "statement": RstToHtmlFragmentWriter.write(
+                    "statement_source": RstToHtmlFragmentWriter.write(
+                        node.get_statement_single_or_multiline()
+                    ),
+                    "statement_html": RstToHtmlFragmentWriter.write(
                         node.get_statement_single_or_multiline()
                     )
                 }
@@ -51,7 +64,7 @@ def create_requirements_router() -> APIRouter:
                     fields = []
                     for meta_field in node.enumerate_meta_fields():
                         field_dict = {
-                            "uid": uid,
+                            "uid": create_uid(),
                             "title": meta_field[0],
                             "value": meta_field[1]
                         }
@@ -61,9 +74,10 @@ def create_requirements_router() -> APIRouter:
             elif isinstance(node, Section):
                 section_dict = {
                     "type": "SECTION",
-                    "uid": uid,
+                    "uid": create_uid(),
                     "title": node.title,
                 }
+                requirements.append(section_dict)
                 if len(node.free_texts) > 0:
                     free_text = ""
                     for part in node.free_texts[0].parts:
@@ -71,11 +85,24 @@ def create_requirements_router() -> APIRouter:
                             free_text += part
                         elif isinstance(part, InlineLink):
                             free_text += part.link
-                    section_dict["free_text"] = RstToHtmlFragmentWriter.write(
-                        free_text
-                    )
-                requirements.append(section_dict)
+                    free_text_dict = {
+                        "type": "FREETEXT",
+                        "uid": create_uid(),
+                        "text_source": free_text,
+                        "text_html": RstToHtmlFragmentWriter.write(
+                            free_text
+                        )
+                    }
+                    requirements.append(free_text_dict)
+
         return {"requirements": requirements}
+
+    @router.put("/nodes", response_class=JSONResponse)
+    def put_nodes(node: NodeUpdateModel):
+        node.text_html = RstToHtmlFragmentWriter.write(
+            node.text_source
+        )
+        return node
 
     return router
 
