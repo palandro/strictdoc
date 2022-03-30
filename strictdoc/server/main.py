@@ -10,9 +10,8 @@ from starlette.responses import JSONResponse
 from strictdoc.backend.sdoc.models.inline_link import InlineLink
 from strictdoc.backend.sdoc.models.requirement import Requirement
 from strictdoc.backend.sdoc.models.section import Section
-from strictdoc.backend.sdoc.reader import SDReader
-from strictdoc.core.document_iterator import DocumentCachingIterator
 from strictdoc.export.rst.rst_to_html_fragment_writer import RstToHtmlFragmentWriter
+from strictdoc.server.database import SDocInMemoryDatabase
 
 
 class RequirementModel(BaseModel):
@@ -29,9 +28,6 @@ class NodeUpdateModel(BaseModel):
     text_html: Optional[str]
 
 
-DOC_FILE = "docs/strictdoc.sdoc"
-
-
 def create_uid() -> str:
     return str(uuid.uuid4())
 
@@ -39,15 +35,14 @@ def create_uid() -> str:
 def create_requirements_router() -> APIRouter:
     router = APIRouter()
 
-    document = SDReader().read_from_file(DOC_FILE)
+    database = SDocInMemoryDatabase()
 
     @router.get("/requirements", response_class=JSONResponse)
     def get_requirements():
         print(os.getcwd())
         requirements = []
 
-        iterator = DocumentCachingIterator(document)
-        for node in iterator.all_content():
+        for node in database.iterate_nodes():
             if isinstance(node, Requirement):
                 requirement_dict = {
                     "type": "REQUIREMENT",
