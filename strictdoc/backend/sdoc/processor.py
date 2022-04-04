@@ -50,7 +50,7 @@ class SDocParsingProcessor:
         section.ng_document_reference = self.parse_context.document_reference
 
         if self.parse_context.document_config.auto_levels:
-            if section.level:
+            if section.level and section.level != "None":
                 print(
                     "warning: [SECTION].LEVEL field is provided. "
                     "This contradicts to the option "
